@@ -1,0 +1,53 @@
+{
+  "name": "hathak-platform",
+  "version": "1.0.0",
+  "description": "Multi-service e-commerce and logistics platform (Buy for Me, Retail, Wholesale, Traveler Shipping)",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:optimized": "concurrently \"npm run dev:backend:optimized\" \"npm run dev:frontend:optimized\"",
+    "dev:backend:optimized": "cd backend && npm run dev:optimized",
+    "dev:frontend:optimized": "cd frontend && npm run dev:optimized",
+    "dev:low-memory": "concurrently \"npm run dev:backend:low-memory\" \"npm run dev:frontend:low-memory\"",
+    "dev:backend:low-memory": "cd backend && npm run dev:low-memory",
+    "dev:frontend:low-memory": "cd frontend && npm run dev:low-memory",
+    "build": "npm run build:frontend",
+    "build:frontend": "cd frontend && npm run build",
+    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd frontend && npm start",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "seed": "cd backend && npm run seed",
+    "seed:users": "cd backend && npm run seed:users",
+    "seed:box-contents": "cd backend && npm run seed:box-contents",
+    "seed:buyme-contents": "cd backend && npm run seed:buyme-contents",
+    "seed:complete-contents": "cd backend && npm run seed:complete-contents"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hathaktech/hathak-platform.git"
+  },
+  "keywords": [
+    "e-commerce",
+    "marketplace",
+    "logistics",
+    "buy-for-me",
+    "retail",
+    "wholesale"
+  ],
+  "author": "hathak",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/hathaktech/hathak-platform/issues"
+  },
+  "homepage": "https://github.com/hathaktech/hathak-platform#readme"
+}
