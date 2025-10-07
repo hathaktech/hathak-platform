@@ -1,19 +1,15 @@
-{
-  "run": "npm run dev:replit",
-  "modules": ["nodejs-18"],
-  "env": {
-    "NODE_ENV": "development",
-    "NODE_OPTIONS": "--max-old-space-size=1024",
-    "PORT": "3000",
-    "BACKEND_PORT": "5000"
-  },
-  "files": [
-    ".replit",
-    "replit.nix"
-  ],
-  "deployment": {
-    "startCommand": "npm run start:replit",
-    "healthcheckPath": "/",
-    "healthcheckTimeout": 100
-  }
-}
+run = "npm run dev:replit"
+
+[modules]
+nodejs-18 = ""
+
+[env]
+NODE_ENV = "development"
+NODE_OPTIONS = "--max-old-space-size=1024"
+PORT = "3000"
+BACKEND_PORT = "5000"
+
+[deployment]
+startCommand = "npm run start:replit"
+healthcheckPath = "/"
+healthcheckTimeout = 100
