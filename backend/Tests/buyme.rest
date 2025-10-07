@@ -1,0 +1,51 @@
+### 1. Login as User
+POST http://localhost:3000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "alice@example.com",
+  "password": "secret123"
+}
+
+### 2. Create BuyMe Request (User)
+POST http://localhost:3000/api/buyme
+Content-Type: application/json
+Authorization: Bearer {{userToken}}
+
+{
+  "productName": "Nike Air Zoom Pegasus",
+  "productLink": "https://www.nike.com/product/air-zoom-pegasus",
+  "color": "Black",
+  "size": "42",
+  "quantity": 1,
+  "deliveryCountry": "Saudi Arabia",
+  "shippingMethod": "Express",
+  "notes": "Please double-check authenticity",
+  "image": "https://example.com/shoe.jpg"
+}
+
+### 3. Get My BuyMe Requests (User)
+GET http://localhost:3000/api/buyme/my
+Authorization: Bearer {{userToken}}
+
+### 4. Get Single BuyMe Request by ID (User or Admin)
+GET http://localhost:3000/buyme/{{buymeId}}
+Authorization: Bearer {{userToken}}
+
+### 5. Update BuyMe Request (User or Admin)
+PUT http://localhost:3000/buyme/{{buymeId}}
+Content-Type: application/json
+Authorization: Bearer {{userToken}}
+
+{
+  "status": "purchased",
+  "notes": "Purchased from Nike Turkey"
+}
+
+### 6. Delete BuyMe Request (User or Admin)
+DELETE http://localhost:3000/buyme/{{buymeId}}
+Authorization: Bearer {{userToken}}
+
+### 7. Get All BuyMe Requests (Admin only)
+GET http://localhost:3000/buyme
+Authorization: Bearer {{adminToken}}

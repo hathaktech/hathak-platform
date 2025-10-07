@@ -1,0 +1,31 @@
+### REGISTER a new user
+POST http://localhost:3000/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Alice",
+  "email": "alice@example.com",
+  "password": "secret123"
+}
+
+
+### LOGIN as existing user
+POST http://localhost:3000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "aliceeee@example.com",
+  "password": "secret123"
+}
+
+# ⚠️ Copy the "token" from the response and use it below
+
+
+### GET my profile (requires token)
+GET http://localhost:3000/api/auth/me
+Authorization: Bearer {{userToken}}
+
+
+### PROMOTE a user to admin (requires admin token)
+PUT http://localhost:3000/auth/promote/USER_ID
+Authorization: Bearer {{adminToken}}

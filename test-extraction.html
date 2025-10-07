@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Product Extraction</title>
+</head>
+<body>
+    <h1>Test Product Extraction API</h1>
+    <input type="text" id="urlInput" placeholder="Enter product URL" style="width: 400px;">
+    <button onclick="testExtraction()">Extract Product</button>
+    <br><br>
+    <div id="result"></div>
+
+    <script>
+        async function testExtraction() {
+            const url = document.getElementById('urlInput').value;
+            const resultDiv = document.getElementById('result');
+
+            if (!url) {
+                resultDiv.innerHTML = '<p style="color: red;">Please enter a URL</p>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<p>Extracting...</p>';
+
+            try {
+                const response = await fetch('http://localhost:5000/api/extract-product', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    resultDiv.innerHTML = `
+                        <h3>✅ Extraction Successful</h3>
+                        <p><strong>Title:</strong> ${result.data.title}</p>
+                        <p><strong>Price:</strong> ${result.data.price}</p>
+                        <p><strong>Image:</strong> <a href="${result.data.image}" target="_blank">${result.data.image}</a></p>
+                        <p><strong>Colors:</strong> ${result.data.colors ? result.data.colors.join(', ') : 'None'}</p>
+                        <p><strong>Sizes:</strong> ${result.data.sizes ? result.data.sizes.join(', ') : 'None'}</p>
+                        <p><strong>Store URL:</strong> ${result.data.storeUrl}</p>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <h3>❌ Extraction Failed</h3>
+                        <p><strong>Error:</strong> ${result.error}</p>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <h3>❌ Network Error</h3>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

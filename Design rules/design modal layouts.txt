@@ -1,0 +1,4 @@
+design the layout to be more compact and vertical, ensuring all fields are visible without scrolling on larger screens while maintaining mobile responsiveness.
+date and time formats
+date DD/MM/YY
+TİME HH::MM:SS

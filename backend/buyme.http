@@ -1,0 +1,28 @@
+### Get all BuyMe requests
+GET http://localhost:3000/api/buyme
+
+### Get a single BuyMe request (replace :id with real request ID)
+GET http://localhost:3000/api/buyme/:id
+
+### Create a new BuyMe request
+POST http://localhost:3000/api/buyme
+Content-Type: application/json
+
+{
+  "userId": "PUT_A_REAL_USER_ID_HERE",
+  "productName": "Nike Air Max",
+  "productLink": "https://example.com/nike-air-max",
+  "notes": "Size 42, Black"
+}
+
+### Update a BuyMe request (replace :id with real request ID)
+PUT http://localhost:3000/api/buyme/:id
+Content-Type: application/json
+
+{
+  "status": "approved",
+  "notes": "Admin approved this request"
+}
+
+### Delete a BuyMe request (replace :id with real request ID)
+DELETE http://localhost:3000/api/buyme/:id

@@ -1,0 +1,42 @@
+{
+  "name": "frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "dev:stable": "next dev",
+    "dev:optimized": "cross-env NODE_OPTIONS=--max-old-space-size=2048 next dev",
+    "dev:low-memory": "cross-env NODE_OPTIONS=--max-old-space-size=1024 --max-semi-space-size=64 --gc-interval=100 next dev",
+    "dev:ultra-low": "cross-env NODE_OPTIONS=\"--max-old-space-size=512 --max-semi-space-size=32 --gc-interval=50 --optimize-for-size\" next dev --port 3000",
+    "dev:minimal": "cross-env NODE_OPTIONS=\"--max-old-space-size=256 --max-semi-space-size=16 --gc-interval=25 --optimize-for-size --no-warnings\" next dev --port 3000",
+    "build": "next build",
+    "build:stable": "next build",
+    "build:low-memory": "cross-env NODE_OPTIONS=--max-old-space-size=1024 next build",
+    "start": "next start",
+    "start:low-memory": "cross-env NODE_OPTIONS=--max-old-space-size=512 next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "axios": "^1.11.0",
+    "lucide-react": "^0.542.0",
+    "next": "^15.5.2",
+    "react": "19.1.0",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
+    "react-dom": "19.1.0"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "cross-env": "^10.0.0",
+    "eslint": "^9",
+    "eslint-config-next": "15.5.2",
+    "sharp": "^0.34.3",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

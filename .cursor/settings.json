@@ -1,0 +1,76 @@
+{
+  // Performance optimizations
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/dist/**": true,
+    "**/build/**": true,
+    "**/.next/**": true,
+    "**/coverage/**": true,
+    "**/.git/**": true,
+    "**/logs/**": true,
+    "**/tmp/**": true,
+    "**/temp/**": true
+  },
+  
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/.next": true,
+    "**/coverage": true,
+    "**/.git": true,
+    "**/logs": true,
+    "**/tmp": true,
+    "**/temp": true
+  },
+  
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/.next": true,
+    "**/coverage": true,
+    "**/logs": true,
+    "**/tmp": true,
+    "**/temp": true
+  },
+  
+  // Disable unnecessary features
+  "editor.minimap.enabled": false,
+  "editor.renderWhitespace": "none",
+  "editor.renderControlCharacters": false,
+  "editor.renderIndentGuides": false,
+  "editor.bracketPairColorization.enabled": false,
+  "editor.guides.bracketPairs": false,
+  
+  // Reduce IntelliSense load
+  "typescript.suggest.autoImports": false,
+  "typescript.suggest.includeCompletionsForModuleExports": false,
+  "javascript.suggest.autoImports": false,
+  "javascript.suggest.includeCompletionsForModuleExports": false,
+  
+  // Disable extensions that consume resources
+  "extensions.autoUpdate": false,
+  "extensions.autoCheckUpdates": false,
+  
+  // Reduce file watching
+  "files.watcherInclude": [
+    "**/*.js",
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.jsx",
+    "**/*.json",
+    "**/*.md"
+  ],
+  
+  // Memory optimizations
+  "typescript.preferences.includePackageJsonAutoImports": "off",
+  "typescript.suggest.includeCompletionsWithSnippetText": false,
+  "javascript.suggest.includeCompletionsWithSnippetText": false,
+  
+  // Disable telemetry
+  "telemetry.telemetryLevel": "off",
+  "redhat.telemetry.enabled": false
+}
+
+

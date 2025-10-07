@@ -1,0 +1,66 @@
+cd backend
+npm run dev
+npm run dev:optimized
+npm run dev:low-memory
+
+cd frontend
+npm run dev
+npm run dev:optimized
+npm run dev:low-memory
+
+
+cd backend
+npm run dev:low-memory
+
+cd frontend
+npm run dev:low-memory
+
+
+Database User
+hathak-user
+qeLvVtbEkoOvXR4i
+
+mongodb+srv://hathak-user:qeLvVtbEkoOvXR4i@hathak-cluster.dhk9vzl.mongodb.net/
+
+
+
+keep the current style and design of the buy for me page and just include and implement the new features
+
+Develop the Buy for Me service and the Shop Now button function according to the following:
+
+Frontend: User Input
+Consent checkbox:
+“I allow this site to retrieve public product information from the external store to help me place a purchase order.”
+Backend: One-Time Fetch
+Use server-side request (Node fetch)
+Parse and sanitize:
+Title
+Price
+main Image of the product  (for display only and to garantee its the right product)
+Size/color options
+Save in cache or DB with timestamp (24–48 hours only)
+Display: Proxy Order UI
+Show formatted product card
+Include buttons:
+“Add to Cart”
+“View original product"
+Add clear disclaimer
+
+a modal for manual entry
+Product Details Modal
+Component: frontend/src/components/buyme/ProductDetailsModal.tsx
+
+
+
+Review the system and code for extracting product details from the links provided by the customer on the website, as the current one does not work at all.
+
+lets fix the extraction process and system
+it does not work
+dont build it just for  avva website build it for  any website/store in the world
+
+to siplify the the extraction we only need the following details of the products:
+Title
+Price
+Main Image of the product (for display only and to guarantee it's the right product)
+Size/color options (to let the customer choosing)
+

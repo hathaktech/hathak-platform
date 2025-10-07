@@ -1,0 +1,3 @@
+mongodb+srv://hathak-user:qeLvVtbEkoOvXR4i@hathak-cluster.dhk9vzl.mongodb.net/?retryWrites=true&w=majority&appName=hathak-cluster
+
+JWT_SECRET=your-super-secret-jwt-key-change-this-in-production

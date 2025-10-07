@@ -1,0 +1,1681 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useAdminAuth } from '@/context/AdminAuthContext';
+import BuyForMeRequestReview from './BuyForMeRequestReview';
+import CreateRequestForCustomer from './CreateRequestForCustomer';
+import StatusDashboard from './StatusDashboard';
+import KanbanBoard from './KanbanBoard';
+import MobileStatusCard from './MobileStatusCard';
+import SmartStatusBadge from './SmartStatusBadge';
+import StatusTimeline from './StatusTimeline';
+import { 
+  Package, 
+  Clock, 
+  CheckCircle, 
+  Camera, 
+  Truck, 
+  AlertTriangle,
+  Eye,
+  Trash2,
+  Plus,
+  Search,
+  Filter,
+  Download,
+  Upload,
+  CreditCard,
+  ShoppingCart,
+  Warehouse,
+  Box,
+  Users,
+  Calendar,
+  DollarSign,
+  MessageSquare,
+  CheckCircle2,
+  XCircle,
+  ChevronDown,
+  ChevronRight,
+  User,
+  X,
+  Mail,
+  MapPin,
+  ExternalLink,
+  Info,
+  Grid3X3,
+  List,
+  BarChart3,
+  Kanban
+} from 'lucide-react';
+
+interface BuyForMeRequest {
+  id: string;
+  requestNumber: string;
+  customerId: string;
+  customerName: string;
+  customerEmail: string;
+  items: {
+    id: string;
+    name: string;
+    url: string;
+    quantity: number;
+    price: number;
+    description?: string;
+    sizes?: string[];
+    colors?: string[];
+  }[];
+  totalAmount: number;
+  status: 'pending' | 'under_review' | 'approved' | 'rejected' | 'payment_pending' | 'payment_completed' | 'purchased' | 'to_be_shipped_to_box' | 'arrived_to_box' | 'admin_control' | 'customer_review' | 'customer_approved' | 'customer_rejected' | 'packing_choice' | 'packed' | 'shipped' | 'delivered' | 'return_requested' | 'replacement_requested' | 'cancelled';
+  createdAt: string;
+  updatedAt: string;
+  notes?: string;
+  trackingNumber?: string;
+  photos?: string[];
+  packagingChoice?: 'original' | 'grouped' | 'mixed';
+  reviewStatus?: 'pending' | 'approved' | 'rejected' | 'needs_modification';
+  reviewComments?: {
+    comment: string;
+    adminName: string;
+    adminId: string;
+    createdAt: string;
+    isInternal: boolean;
+  }[];
+  rejectionReason?: string;
+  priority?: 'low' | 'medium' | 'high';
+  shippingAddress: {
+    name: string;
+    address: string;
+    city: string;
+    country: string;
+    postalCode: string;
+  };
+  // Track if request was modified by user
+  modifiedByUser?: boolean;
+  // Track if request was modified by admin
+  modifiedByAdmin?: boolean;
+  adminModificationDate?: string;
+  adminModificationNote?: string;
+  lastModifiedByAdmin?: string;
+  lastModifiedByUser?: string;
+  // Track if request was modified but needs modification again
+  modifiedButNeedsModification?: boolean;
+  originalValues?: {
+    productName?: string;
+    productLink?: string;
+    notes?: string;
+    quantity?: number;
+    estimatedPrice?: number;
+    currency?: string;
+  };
+  modificationHistory?: {
+    modificationNumber: number;
+    modifiedAt: string;
+    previousValues: {
+      productName?: string;
+      productLink?: string;
+      notes?: string;
+      quantity?: number;
+      estimatedPrice?: number;
+      currency?: string;
+    };
+    newValues: {
+      productName?: string;
+      productLink?: string;
+      notes?: string;
+      quantity?: number;
+      estimatedPrice?: number;
+      currency?: string;
+    };
+  }[];
+}
+
+const BuyForMeManagement: React.FC = () => {
+  const { admin, hasPermission } = useAdminAuth();
+  const [requests, setRequests] = useState<BuyForMeRequest[]>([]);
+  const [selectedRequest, setSelectedRequest] = useState<BuyForMeRequest | null>(null);
+  const [reviewRequest, setReviewRequest] = useState<BuyForMeRequest | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [groupByCustomer, setGroupByCustomer] = useState(false);
+  const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set());
+  
+  // New view modes
+  const [viewMode, setViewMode] = useState<'dashboard' | 'kanban' | 'list' | 'mobile'>('dashboard');
+  const [isMobile, setIsMobile] = useState(false);
+  
+  // Advanced filters state
+  const [advancedFilters, setAdvancedFilters] = useState({
+    dateRange: {
+      startDate: '',
+      endDate: ''
+    },
+    amountRange: {
+      minAmount: '',
+      maxAmount: ''
+    },
+    customerFilter: '',
+    requestNumberFilter: '',
+    hasNotes: 'all' as 'all' | 'yes' | 'no',
+    hasImages: 'all' as 'all' | 'yes' | 'no'
+  });
+
+  // Fetch real data from API
+  const fetchRequests = async () => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch('/api/buyme', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        // Transform backend data to match frontend interface
+        const transformedRequests: BuyForMeRequest[] = data.data.map((request: any) => ({
+          id: request._id,
+          requestNumber: request.requestNumber || `P${request._id.slice(-8).toUpperCase()}`,
+          customerId: request.userId?._id || request.userId,
+          customerName: request.userId?.name || 'Unknown User',
+          customerEmail: request.userId?.email || 'unknown@example.com',
+          items: [{
+            id: request._id,
+            name: request.productName,
+            url: request.productLink,
+            quantity: request.quantity || 1,
+            price: request.estimatedPrice || 0,
+            description: request.notes || '',
+            sizes: request.sizes || [],
+            colors: request.colors || []
+          }],
+          totalAmount: (request.estimatedPrice || 0) * (request.quantity || 1),
+          status: request.status,
+          createdAt: request.createdAt,
+          updatedAt: request.updatedAt,
+          modifiedByUser: request.modifiedByUser,
+          lastModifiedByUser: request.lastModifiedByUser,
+          modifiedButNeedsModification: request.modifiedButNeedsModification,
+          originalValues: request.originalValues,
+          modificationHistory: request.modificationHistory,
+          notes: request.notes,
+          reviewStatus: request.reviewStatus,
+          reviewComments: request.reviewComments || [],
+          rejectionReason: request.rejectionReason,
+          priority: request.priority || 'medium',
+          shippingAddress: {
+            name: request.userId?.name || 'Unknown User',
+            address: request.deliveryCountry || '',
+            city: '',
+            country: request.deliveryCountry || '',
+            postalCode: ''
+          }
+        }));
+        
+        setRequests(transformedRequests);
+      } else {
+        console.error('Failed to fetch requests:', data);
+        setRequests([]);
+      }
+    } catch (error) {
+      console.error('Error fetching BuyMe requests:', error);
+      setRequests([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRequests();
+  }, []);
+
+  // Mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+      if (window.innerWidth < 768) {
+        setViewMode('mobile');
+      }
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Delete request handler
+  const handleDeleteRequest = async (requestId: string) => {
+    if (!confirm('Are you sure you want to delete this request? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`/api/buyme/${requestId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete request');
+      }
+
+      // Remove the deleted request from the state
+      setRequests(prevRequests => prevRequests.filter(request => request.id !== requestId));
+      
+      // Show success message (you can add a toast notification here)
+      alert('Request deleted successfully');
+    } catch (error) {
+      console.error('Error deleting request:', error);
+      alert('Failed to delete request. Please try again.');
+    }
+  };
+
+  const getStatusText = (request: BuyForMeRequest) => {
+    const statusMap = {
+      pending: 'Pending',
+      under_review: 'Under Review',
+      approved: 'Approved',
+      rejected: 'Rejected',
+      payment_pending: 'Payment Pending',
+      payment_completed: 'Payment Completed',
+      purchased: 'Purchased',
+      to_be_shipped_to_box: 'To Be Shipped to Box',
+      arrived_to_box: 'Arrived to Box',
+      admin_control: 'Admin Control',
+      customer_review: 'Customer Review',
+      customer_approved: 'Customer Approved',
+      customer_rejected: 'Customer Rejected',
+      packing_choice: 'Packing Choice',
+      packed: 'Packed',
+      shipped: 'Shipped',
+      delivered: 'Delivered',
+      return_requested: 'Return Requested',
+      replacement_requested: 'Replacement Requested',
+      cancelled: 'Cancelled',
+    };
+    return statusMap[request.status as keyof typeof statusMap] || 'Unknown';
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'under_review': return 'bg-blue-100 text-blue-800';
+      case 'approved': return 'bg-green-100 text-green-800';
+      case 'rejected': return 'bg-red-100 text-red-800';
+      case 'payment_pending': return 'bg-orange-100 text-orange-800';
+      case 'payment_completed': return 'bg-green-100 text-green-800';
+      case 'purchased': return 'bg-purple-100 text-purple-800';
+      case 'to_be_shipped_to_box': return 'bg-indigo-100 text-indigo-800';
+      case 'arrived_to_box': return 'bg-teal-100 text-teal-800';
+      case 'admin_control': return 'bg-pink-100 text-pink-800';
+      case 'customer_review': return 'bg-amber-100 text-amber-800';
+      case 'customer_approved': return 'bg-green-100 text-green-800';
+      case 'customer_rejected': return 'bg-red-100 text-red-800';
+      case 'packing_choice': return 'bg-cyan-100 text-cyan-800';
+      case 'packed': return 'bg-blue-100 text-blue-800';
+      case 'shipped': return 'bg-blue-100 text-blue-800';
+      case 'delivered': return 'bg-green-100 text-green-800';
+      case 'return_requested': return 'bg-red-100 text-red-800';
+      case 'replacement_requested': return 'bg-yellow-100 text-yellow-800';
+      case 'cancelled': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'pending': return <Clock className="w-4 h-4" />;
+      case 'under_review': return <Eye className="w-4 h-4" />;
+      case 'approved': return <CheckCircle2 className="w-4 h-4" />;
+      case 'rejected': return <XCircle className="w-4 h-4" />;
+      case 'payment_pending': return <CreditCard className="w-4 h-4" />;
+      case 'payment_completed': return <CheckCircle className="w-4 h-4" />;
+      case 'purchased': return <ShoppingCart className="w-4 h-4" />;
+      case 'to_be_shipped_to_box': return <Truck className="w-4 h-4" />;
+      case 'arrived_to_box': return <Warehouse className="w-4 h-4" />;
+      case 'admin_control': return <Camera className="w-4 h-4" />;
+      case 'customer_review': return <Eye className="w-4 h-4" />;
+      case 'customer_approved': return <CheckCircle className="w-4 h-4" />;
+      case 'customer_rejected': return <XCircle className="w-4 h-4" />;
+      case 'packing_choice': return <Box className="w-4 h-4" />;
+      case 'packed': return <Package className="w-4 h-4" />;
+      case 'shipped': return <Truck className="w-4 h-4" />;
+      case 'delivered': return <CheckCircle className="w-4 h-4" />;
+      case 'return_requested': return <AlertTriangle className="w-4 h-4" />;
+      case 'replacement_requested': return <AlertTriangle className="w-4 h-4" />;
+      case 'cancelled': return <XCircle className="w-4 h-4" />;
+      default: return <Clock className="w-4 h-4" />;
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'bg-red-100 text-red-800 border-red-200';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'low': return 'bg-green-100 text-green-800 border-green-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+
+  const filteredRequests = requests.filter(request => {
+    // Basic filters
+    const matchesStatus = filterStatus === 'all' || request.status === filterStatus;
+    const matchesSearch = request.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         request.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         request.requestNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         request.customerEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         request.items.some(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    // Advanced filters
+    const matchesDateRange = () => {
+      if (!advancedFilters.dateRange.startDate && !advancedFilters.dateRange.endDate) return true;
+      const requestDate = new Date(request.createdAt);
+      const startDate = advancedFilters.dateRange.startDate ? new Date(advancedFilters.dateRange.startDate) : null;
+      const endDate = advancedFilters.dateRange.endDate ? new Date(advancedFilters.dateRange.endDate) : null;
+      
+      if (startDate && requestDate < startDate) return false;
+      if (endDate && requestDate > endDate) return false;
+      return true;
+    };
+    
+    const matchesAmountRange = () => {
+      if (!advancedFilters.amountRange.minAmount && !advancedFilters.amountRange.maxAmount) return true;
+      const amount = request.totalAmount;
+      const minAmount = parseFloat(advancedFilters.amountRange.minAmount) || 0;
+      const maxAmount = parseFloat(advancedFilters.amountRange.maxAmount) || Infinity;
+      
+      return amount >= minAmount && amount <= maxAmount;
+    };
+    
+    const matchesCustomerFilter = () => {
+      if (!advancedFilters.customerFilter) return true;
+      return request.customerName.toLowerCase().includes(advancedFilters.customerFilter.toLowerCase()) ||
+             request.customerEmail.toLowerCase().includes(advancedFilters.customerFilter.toLowerCase());
+    };
+    
+    const matchesRequestNumberFilter = () => {
+      if (!advancedFilters.requestNumberFilter) return true;
+      return request.requestNumber.toLowerCase().includes(advancedFilters.requestNumberFilter.toLowerCase());
+    };
+    
+    const matchesNotesFilter = () => {
+      if (advancedFilters.hasNotes === 'all') return true;
+      const hasNotes = request.notes && request.notes.trim().length > 0;
+      return advancedFilters.hasNotes === 'yes' ? hasNotes : !hasNotes;
+    };
+    
+    const matchesImagesFilter = () => {
+      if (advancedFilters.hasImages === 'all') return true;
+      const hasImages = request.items.some(item => item.name && item.name.trim().length > 0); // Simplified check
+      return advancedFilters.hasImages === 'yes' ? hasImages : !hasImages;
+    };
+    
+    return matchesStatus && matchesSearch && matchesDateRange() && matchesAmountRange() && 
+           matchesCustomerFilter() && matchesRequestNumberFilter() && matchesNotesFilter() && matchesImagesFilter();
+  });
+
+  // Group requests by customer
+  const groupedRequests = filteredRequests.reduce((acc, request) => {
+    const customerKey = `${request.customerId}-${request.customerEmail}`;
+    if (!acc[customerKey]) {
+      acc[customerKey] = {
+        customerId: request.customerId,
+        customerName: request.customerName,
+        customerEmail: request.customerEmail,
+        requests: [],
+        totalAmount: 0,
+        requestCount: 0
+      };
+    }
+    acc[customerKey].requests.push(request);
+    acc[customerKey].totalAmount += request.totalAmount;
+    acc[customerKey].requestCount += 1;
+    return acc;
+  }, {} as Record<string, {
+    customerId: string;
+    customerName: string;
+    customerEmail: string;
+    requests: BuyForMeRequest[];
+    totalAmount: number;
+    requestCount: number;
+  }>);
+
+  // Toggle customer expansion
+  const toggleCustomerExpansion = (customerKey: string) => {
+    const newExpanded = new Set(expandedCustomers);
+    if (newExpanded.has(customerKey)) {
+      newExpanded.delete(customerKey);
+    } else {
+      newExpanded.add(customerKey);
+    }
+    setExpandedCustomers(newExpanded);
+  };
+
+  const statusCounts = {
+    pending: requests.filter(r => r.status === 'pending').length,
+    under_review: requests.filter(r => r.status === 'under_review').length,
+    approved: requests.filter(r => r.status === 'approved').length,
+    rejected: requests.filter(r => r.status === 'rejected').length,
+    payment_pending: requests.filter(r => r.status === 'payment_pending').length,
+    payment_completed: requests.filter(r => r.status === 'payment_completed').length,
+    purchased: requests.filter(r => r.status === 'purchased').length,
+    to_be_shipped_to_box: requests.filter(r => r.status === 'to_be_shipped_to_box').length,
+    arrived_to_box: requests.filter(r => r.status === 'arrived_to_box').length,
+    admin_control: requests.filter(r => r.status === 'admin_control').length,
+    customer_review: requests.filter(r => r.status === 'customer_review').length,
+    customer_approved: requests.filter(r => r.status === 'customer_approved').length,
+    customer_rejected: requests.filter(r => r.status === 'customer_rejected').length,
+    packing_choice: requests.filter(r => r.status === 'packing_choice').length,
+    packed: requests.filter(r => r.status === 'packed').length,
+    shipped: requests.filter(r => r.status === 'shipped').length,
+    delivered: requests.filter(r => r.status === 'delivered').length,
+    return_requested: requests.filter(r => r.status === 'return_requested').length,
+    replacement_requested: requests.filter(r => r.status === 'replacement_requested').length,
+  };
+
+  // Export functionality
+  const exportToCSV = () => {
+    const csvHeaders = [
+      'Request Number',
+      'Customer Name',
+      'Customer Email',
+      'Customer ID',
+      'Product Name',
+      'Product URL',
+      'Quantity',
+      'Unit Price',
+      'Total Amount',
+      'Status',
+      'Created Date',
+      'Updated Date',
+      'Notes',
+      'Shipping Country',
+      'Tracking Number'
+    ];
+
+    const csvData = filteredRequests.map(request => {
+      return request.items.map(item => [
+        request.requestNumber,
+        request.customerName,
+        request.customerEmail,
+        request.customerId,
+        item.name,
+        item.url,
+        item.quantity,
+        item.price,
+        request.totalAmount,
+        request.status,
+        new Date(request.createdAt).toLocaleDateString(),
+        new Date(request.updatedAt).toLocaleDateString(),
+        request.notes || '',
+        request.shippingAddress.country,
+        request.trackingNumber || ''
+      ]);
+    }).flat();
+
+    const csvContent = [
+      csvHeaders.join(','),
+      ...csvData.map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `buyme-requests-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 py-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        {/* Enhanced Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg shadow-md">
+              <Package className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent">
+                BuyForMe Management
+              </h1>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Manage customer requests and fulfillment process
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-3">
+            {/* View Mode Controls */}
+            {!isMobile && (
+              <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('dashboard')}
+                  className={`p-2 rounded-md transition-colors ${
+                    viewMode === 'dashboard' 
+                      ? 'bg-white text-blue-600 shadow-sm' 
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                  title="Dashboard View"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('kanban')}
+                  className={`p-2 rounded-md transition-colors ${
+                    viewMode === 'kanban' 
+                      ? 'bg-white text-blue-600 shadow-sm' 
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                  title="Kanban Board"
+                >
+                  <Kanban className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded-md transition-colors ${
+                    viewMode === 'list' 
+                      ? 'bg-white text-blue-600 shadow-sm' 
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                  title="List View"
+                >
+                  <List className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+            
+            <button 
+              onClick={fetchRequests}
+              disabled={isLoading}
+              className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+            >
+              <svg className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {isLoading ? 'Refreshing...' : 'Refresh'}
+            </button>
+            <button 
+              onClick={() => setShowCreateForm(true)}
+              className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-md hover:shadow-lg"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New Request
+            </button>
+            <button 
+              onClick={exportToCSV}
+              className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-lg hover:from-gray-600 hover:to-gray-700 transition-all duration-200 shadow-md hover:shadow-lg"
+              title="Export filtered data to CSV"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export
+            </button>
+          </div>
+        </div>
+
+        {/* Main Content Area - Dynamic Views */}
+        {viewMode === 'dashboard' && (
+          <StatusDashboard requests={requests} />
+        )}
+
+        {viewMode === 'kanban' && (
+          <KanbanBoard 
+            requests={requests}
+            onRequestClick={setSelectedRequest}
+          />
+        )}
+
+        {viewMode === 'mobile' && (
+          <div className="space-y-4">
+            {filteredRequests.map((request) => (
+              <MobileStatusCard
+                key={request.id}
+                request={request}
+                onRequestClick={setSelectedRequest}
+              />
+            ))}
+          </div>
+        )}
+
+        {viewMode === 'list' && (
+          <div>
+            {/* Enhanced Status Overview Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+              <div 
+                className={`bg-white/90 backdrop-blur-sm p-4 rounded-xl border border-white/20 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
+                  filterStatus === 'pending' ? 'ring-2 ring-yellow-500 bg-yellow-50/80' : 'hover:bg-white/95'
+                }`}
+                onClick={() => setFilterStatus(filterStatus === 'pending' ? 'all' : 'pending')}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Pending</p>
+                    <p className="text-2xl font-bold text-yellow-600">{statusCounts.pending}</p>
+                  </div>
+                  <div className="w-8 h-8 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-lg flex items-center justify-center">
+                    <Clock className="w-4 h-4 text-yellow-600" />
+                  </div>
+                </div>
+              </div>
+              <div 
+                className={`bg-white/90 backdrop-blur-sm p-4 rounded-xl border border-white/20 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
+                  filterStatus === 'approved' ? 'ring-2 ring-green-500 bg-green-50/80' : 'hover:bg-white/95'
+                }`}
+                onClick={() => setFilterStatus(filterStatus === 'approved' ? 'all' : 'approved')}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Approved</p>
+                    <p className="text-2xl font-bold text-green-600">{statusCounts.approved}</p>
+                  </div>
+                  <div className="w-8 h-8 bg-gradient-to-br from-green-100 to-green-200 rounded-lg flex items-center justify-center">
+                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                  </div>
+                </div>
+              </div>
+              <div 
+                className={`bg-white/90 backdrop-blur-sm p-4 rounded-xl border border-white/20 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
+                  filterStatus === 'purchased' ? 'ring-2 ring-purple-500 bg-purple-50/80' : 'hover:bg-white/95'
+                }`}
+                onClick={() => setFilterStatus(filterStatus === 'purchased' ? 'all' : 'purchased')}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Purchased</p>
+                    <p className="text-2xl font-bold text-purple-600">{statusCounts.purchased}</p>
+                  </div>
+                  <div className="w-8 h-8 bg-gradient-to-br from-purple-100 to-purple-200 rounded-lg flex items-center justify-center">
+                    <ShoppingCart className="w-4 h-4 text-purple-600" />
+                  </div>
+                </div>
+              </div>
+              <div 
+                className={`bg-white/90 backdrop-blur-sm p-4 rounded-xl border border-white/20 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
+                  filterStatus === 'to_be_shipped_to_box' ? 'ring-2 ring-indigo-500 bg-indigo-50/80' : 'hover:bg-white/95'
+                }`}
+                onClick={() => setFilterStatus(filterStatus === 'to_be_shipped_to_box' ? 'all' : 'to_be_shipped_to_box')}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">To Box</p>
+                    <p className="text-2xl font-bold text-indigo-600">{statusCounts.to_be_shipped_to_box}</p>
+                  </div>
+                  <div className="w-8 h-8 bg-gradient-to-br from-indigo-100 to-indigo-200 rounded-lg flex items-center justify-center">
+                    <Truck className="w-4 h-4 text-indigo-600" />
+                  </div>
+                </div>
+              </div>
+              <div 
+                className={`bg-white/90 backdrop-blur-sm p-4 rounded-xl border border-white/20 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
+                  filterStatus === 'arrived_to_box' ? 'ring-2 ring-teal-500 bg-teal-50/80' : 'hover:bg-white/95'
+                }`}
+                onClick={() => setFilterStatus(filterStatus === 'arrived_to_box' ? 'all' : 'arrived_to_box')}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">At Box</p>
+                    <p className="text-2xl font-bold text-teal-600">{statusCounts.arrived_to_box}</p>
+                  </div>
+                  <div className="w-8 h-8 bg-gradient-to-br from-teal-100 to-teal-200 rounded-lg flex items-center justify-center">
+                    <Warehouse className="w-4 h-4 text-teal-600" />
+                  </div>
+                </div>
+              </div>
+              <div 
+                className={`bg-white/90 backdrop-blur-sm p-4 rounded-xl border border-white/20 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
+                  filterStatus === 'delivered' ? 'ring-2 ring-green-500 bg-green-50/80' : 'hover:bg-white/95'
+                }`}
+                onClick={() => setFilterStatus(filterStatus === 'delivered' ? 'all' : 'delivered')}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Delivered</p>
+                    <p className="text-2xl font-bold text-green-600">{statusCounts.delivered}</p>
+                  </div>
+                  <div className="w-8 h-8 bg-gradient-to-br from-green-100 to-green-200 rounded-lg flex items-center justify-center">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+        {/* Enhanced Filters and Search */}
+        <div className="bg-white/90 backdrop-blur-sm p-4 rounded-xl border border-white/20 shadow-sm">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search requests by customer, product, or request number..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white/80 backdrop-blur-sm"
+                />
+                {/* Active filters indicator */}
+                {Object.values(advancedFilters).some(filter => {
+                  if (typeof filter === 'object' && filter !== null) {
+                    return Object.values(filter).some(value => value !== '' && value !== 'all');
+                  }
+                  return filter !== '' && filter !== 'all';
+                }) && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" title="Advanced filters active"></div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white/80 backdrop-blur-sm"
+              >
+                <option value="all">All Status</option>
+                <option value="pending">Pending</option>
+                <option value="under_review">Under Review</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="payment_pending">Payment Pending</option>
+                <option value="payment_completed">Payment Completed</option>
+                <option value="purchased">Purchased</option>
+                <option value="to_be_shipped_to_box">To Be Shipped to Box</option>
+                <option value="arrived_to_box">Arrived to Box</option>
+                <option value="admin_control">Admin Control</option>
+                <option value="customer_review">Customer Review</option>
+                <option value="customer_approved">Customer Approved</option>
+                <option value="customer_rejected">Customer Rejected</option>
+                <option value="packing_choice">Packing Choice</option>
+                <option value="packed">Packed</option>
+                <option value="shipped">Shipped</option>
+                <option value="delivered">Delivered</option>
+                <option value="return_requested">Return Requested</option>
+                <option value="replacement_requested">Replacement Requested</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+              <button 
+                onClick={() => setGroupByCustomer(!groupByCustomer)}
+                className={`inline-flex items-center px-4 py-2 rounded-lg transition-all duration-200 ${
+                  groupByCustomer 
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 shadow-md' 
+                    : 'bg-white/80 backdrop-blur-sm text-gray-700 hover:bg-white/90 border border-gray-300'
+                }`}
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Group by Customer
+              </button>
+              <button 
+                onClick={() => setShowMoreFilters(true)}
+                className="inline-flex items-center px-4 py-2 bg-white/80 backdrop-blur-sm text-gray-700 rounded-lg hover:bg-white/90 transition-all duration-200 relative border border-gray-300"
+              >
+                <Filter className="w-4 h-4 mr-2" />
+                More Filters
+                {/* Active filters count badge */}
+                {(() => {
+                  const activeFiltersCount = Object.values(advancedFilters).reduce((count, filter) => {
+                    if (typeof filter === 'object' && filter !== null) {
+                      return count + Object.values(filter).filter(value => value !== '' && value !== 'all').length;
+                    }
+                    return count + (filter !== '' && filter !== 'all' ? 1 : 0);
+                  }, 0);
+                  
+                  return activeFiltersCount > 0 ? (
+                    <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
+                      {activeFiltersCount}
+                    </span>
+                  ) : null;
+                })()}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Enhanced Requests Table */}
+        <div className="bg-white/90 backdrop-blur-sm rounded-xl border border-white/20 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+          {groupByCustomer ? (
+            // Grouped View
+            <div className="divide-y divide-gray-200">
+              {Object.keys(groupedRequests).length === 0 ? (
+                <div className="px-6 py-8 text-center text-gray-500">
+                  <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p>No requests found matching your criteria.</p>
+                </div>
+              ) : (
+                Object.entries(groupedRequests).map(([customerKey, customerGroup]) => {
+                const isExpanded = expandedCustomers.has(customerKey);
+                return (
+                  <div key={customerKey} className="bg-white">
+                    {/* Customer Header */}
+                    <div 
+                      className="px-6 py-4 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors"
+                      onClick={() => toggleCustomerExpansion(customerKey)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          {isExpanded ? (
+                            <ChevronDown className="w-5 h-5 text-gray-500" />
+                          ) : (
+                            <ChevronRight className="w-5 h-5 text-gray-500" />
+                          )}
+                          <User className="w-5 h-5 text-gray-500" />
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {customerGroup.customerName}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {customerGroup.customerEmail}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-4 text-sm text-gray-500">
+                          <span>{customerGroup.requestCount} request{customerGroup.requestCount !== 1 ? 's' : ''}</span>
+                          <span className="font-medium text-gray-900">
+                            ${customerGroup.totalAmount.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Customer Requests */}
+                    {isExpanded && (
+                      <div className="border-t border-gray-200">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Request No.
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Amount
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Status
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Created
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Actions
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {customerGroup.requests.map((request) => (
+                              <tr key={request.id} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm font-medium text-gray-900">{request.requestNumber}</div>
+                                  <div className="text-xs text-gray-500">ID: {request.id.slice(-8)}</div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm font-medium text-gray-900">
+                                    ${request.totalAmount.toFixed(2)}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
+                                      {getStatusIcon(request.status)}
+                                      <span className="ml-1">{getStatusText(request)}</span>
+                                    </span>
+                                    {request.modifiedButNeedsModification && (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                        Modify Again
+                                      </span>
+                                    )}
+                                    {request.modifiedByUser && !request.modifiedButNeedsModification && (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                        Modified
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {new Date(request.createdAt).toLocaleDateString()}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                  <div className="flex items-center space-x-2">
+                                    <button
+                                      onClick={() => setSelectedRequest(request)}
+                                      className="text-blue-600 hover:text-blue-900"
+                                      title="View Details"
+                                    >
+                                      <Eye className="w-4 h-4" />
+                                    </button>
+                                    {(request.status === 'pending' || request.status === 'under_review') && (
+                                      <button
+                                        onClick={() => setReviewRequest(request)}
+                                        className="inline-flex items-center px-2 py-1 text-xs font-medium text-green-700 bg-green-100 border border-green-300 rounded-md hover:bg-green-200 hover:text-green-800 transition-colors"
+                                        title="Review Request"
+                                      >
+                                        <MessageSquare className="w-3 h-3 mr-1" />
+                                        Review
+                                      </button>
+                                    )}
+                                    <button 
+                                      onClick={() => handleDeleteRequest(request.id)}
+                                      className="text-red-600 hover:text-red-900" 
+                                      title="Delete"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                );
+              }))
+              }
+            </div>
+          ) : (
+            // Regular Table View
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Request No.
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Customer
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Amount
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Created
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredRequests.map((request) => (
+                  <tr key={request.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{request.requestNumber}</div>
+                      <div className="text-xs text-gray-500">ID: {request.id.slice(-8)}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{request.customerName}</div>
+                        <div className="text-sm text-gray-500">{request.customerEmail}</div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        ${request.totalAmount.toFixed(2)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
+                          {getStatusIcon(request.status)}
+                          <span className="ml-1">{getStatusText(request)}</span>
+                        </span>
+                        {request.modifiedButNeedsModification && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                            Modified Again
+                          </span>
+                        )}
+                        {request.modifiedByUser && !request.modifiedButNeedsModification && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            Modified
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(request.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => setSelectedRequest(request)}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="View Details"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        {(request.status === 'pending' || request.status === 'under_review') && (
+                          <button
+                            onClick={() => setReviewRequest(request)}
+                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-green-700 bg-green-100 border border-green-300 rounded-md hover:bg-green-200 hover:text-green-800 transition-colors"
+                            title="Review Request"
+                          >
+                            <MessageSquare className="w-3 h-3 mr-1" />
+                            Review
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => handleDeleteRequest(request.id)}
+                          className="text-red-600 hover:text-red-900" 
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          </div>
+        )}
+        </div>
+        </div>
+      </div>
+
+      {/* Enhanced Request Detail Modal */}
+        {selectedRequest && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[95vh] overflow-hidden shadow-2xl border-0">
+              
+              {/* Enhanced Header */}
+              <div className="bg-gradient-to-r from-orange-50 to-amber-50 px-6 py-4 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center shadow-lg">
+                      <Package className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-900">Request Details</h2>
+                      <p className="text-sm text-gray-600 font-medium">Request #{selectedRequest.requestNumber} • {selectedRequest.customerName}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedRequest(null)}
+                    className="p-2 hover:bg-white/50 rounded-xl transition-all duration-200 hover:scale-105"
+                  >
+                    <X className="w-6 h-6 text-gray-500" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Content */}
+              <div className="overflow-y-auto max-h-[75vh]">
+                <div className="p-6 space-y-6">
+                  {/* Request Status - Enhanced */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">Current Status</span>
+                      <SmartStatusBadge 
+                        status={selectedRequest.status}
+                        updatedAt={selectedRequest.updatedAt}
+                        size="md"
+                        showTime={true}
+                        showNextAction={true}
+                      />
+                    </div>
+                    
+                    {/* Status Timeline */}
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-3">Progress Timeline</h4>
+                      <StatusTimeline 
+                        status={selectedRequest.status}
+                        showProgress={true}
+                        compact={false}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Admin Modification Indicator */}
+                  {selectedRequest.modifiedByAdmin && (
+                    <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-6">
+                      <h3 className="text-lg font-semibold text-orange-800 mb-4 flex items-center">
+                        <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mr-3">
+                          <AlertTriangle className="w-4 h-4 text-orange-600" />
+                        </div>
+                        Admin Modified
+                      </h3>
+                      <div className="space-y-4">
+                        <div className="bg-white rounded-xl p-4 border border-orange-200 shadow-sm">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                                <User className="w-4 h-4 text-orange-600" />
+                              </div>
+                              <span className="text-sm font-semibold text-gray-900">{selectedRequest.lastModifiedByAdmin || 'Admin'}</span>
+                            </div>
+                            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                              {selectedRequest.adminModificationDate ? new Date(selectedRequest.adminModificationDate).toLocaleDateString() : 'Recently'}
+                            </span>
+                          </div>
+                          {selectedRequest.adminModificationNote && (
+                            <p className="text-sm text-gray-700 leading-relaxed">{selectedRequest.adminModificationNote}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                    
+                    {/* Customer Information - Enhanced Sidebar */}
+                    <div className="lg:col-span-1">
+                      <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 sticky top-4">
+                        <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+                          <User className="w-4 h-4 mr-2 text-orange-600" />
+                          Customer Info
+                        </h4>
+                        <div className="space-y-2">
+                          <div className="bg-white p-2 rounded border">
+                            <p className="text-xs text-gray-500 mb-1">Name</p>
+                            <p className="text-xs font-semibold text-gray-900 truncate">{selectedRequest.customerName}</p>
+                          </div>
+                          <div className="bg-white p-2 rounded border">
+                            <p className="text-xs text-gray-500 mb-1">Email</p>
+                            <p className="text-xs font-semibold text-gray-900 truncate flex items-center">
+                              <Mail className="w-3 h-3 mr-1 text-orange-500 flex-shrink-0" />
+                              <span className="truncate">{selectedRequest.customerEmail}</span>
+                            </p>
+                          </div>
+                          <div className="bg-white p-2 rounded border">
+                            <p className="text-xs text-gray-500 mb-1">Priority</p>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${getPriorityColor(selectedRequest.priority || 'medium')}`}>
+                              {selectedRequest.priority || 'medium'}
+                            </span>
+                          </div>
+                      
+                          {/* Dates Section */}
+                          <div className="bg-white p-2 rounded border">
+                            <p className="text-xs text-gray-500 mb-1">Timeline</p>
+                            <div className="space-y-1">
+                              <div className="text-xs text-gray-700">
+                                <span className="font-medium">Created:</span> {new Date(selectedRequest.createdAt).toLocaleString()}
+                              </div>
+                              <div className="text-xs text-gray-700">
+                                <span className="font-medium">Updated:</span> {new Date(selectedRequest.updatedAt).toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Shipping Address */}
+                          <div className="bg-white p-2 rounded border">
+                            <p className="text-xs text-gray-500 mb-1 flex items-center">
+                              <MapPin className="w-3 h-3 mr-1 text-orange-600" />
+                              Shipping Address
+                            </p>
+                            <div className="text-xs text-gray-700">
+                              <p className="font-medium truncate">{selectedRequest.shippingAddress.name}</p>
+                              <p className="truncate">{selectedRequest.shippingAddress.address}</p>
+                              <p className="truncate">{selectedRequest.shippingAddress.city}, {selectedRequest.shippingAddress.country}</p>
+                              <p>{selectedRequest.shippingAddress.postalCode}</p>
+                            </div>
+                          </div>
+
+                          {/* Total Amount */}
+                          <div className="bg-white p-2 rounded border">
+                            <p className="text-xs text-gray-500 mb-1">Total Amount</p>
+                            <p className="text-lg font-bold text-green-600">${selectedRequest.totalAmount.toFixed(2)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+              
+                    {/* Main Content */}
+                    <div className="lg:col-span-2 space-y-4">
+
+                      {/* Product Details - Enhanced Design */}
+                      <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <h4 className="text-sm font-semibold text-gray-900 flex items-center mb-3">
+                          <Package className="w-4 h-4 mr-2 text-orange-600" />
+                          Product Details
+                        </h4>
+                  
+                  {selectedRequest.items.map((item, index) => (
+                    <div key={item.id} className="bg-white p-3 rounded-lg border border-gray-200 mb-3 last:mb-0">
+                      
+                      {/* Product Name */}
+                      <div className="mb-3">
+                        <p className="text-xs text-gray-500 mb-1">Product Name</p>
+                        <div className="bg-gray-50 p-2 rounded border">
+                          <p className="text-sm font-semibold text-gray-900">{item.name}</p>
+                        </div>
+                      </div>
+
+                      {/* Product Link */}
+                      <div className="mb-3">
+                        <p className="text-xs text-gray-500 mb-1">Product Link</p>
+                        <div className="bg-gray-50 p-2 rounded border">
+                          <div className="flex items-center">
+                            <ExternalLink className="w-3 h-3 mr-1 text-blue-500 flex-shrink-0" />
+                            <a 
+                              href={item.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-sm text-blue-600 hover:text-blue-800 break-all"
+                            >
+                              {item.url}
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Quantity */}
+                      <div className="mb-3">
+                        <p className="text-xs text-gray-500 mb-1">Quantity</p>
+                        <div className="bg-gray-50 p-2 rounded border">
+                          <p className="text-sm font-semibold text-gray-900">{item.quantity}</p>
+                        </div>
+                      </div>
+
+                      {/* Price */}
+                      <div className="mb-3">
+                        <p className="text-xs text-gray-500 mb-1">Price</p>
+                        <div className="bg-gray-50 p-2 rounded border">
+                          <p className="text-sm font-semibold text-green-600">${item.price.toFixed(2)}</p>
+                        </div>
+                      </div>
+
+                      {/* Size */}
+                      {item.sizes && item.sizes.length > 0 && (
+                        <div className="mb-3">
+                          <p className="text-xs text-gray-500 mb-1">Size</p>
+                          <div className="bg-gray-50 p-2 rounded border">
+                            <div className="flex flex-wrap gap-1">
+                              {item.sizes.map((size, sizeIndex) => (
+                                <span key={sizeIndex} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                  {size}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Color */}
+                      {item.colors && item.colors.length > 0 && (
+                        <div className="mb-3">
+                          <p className="text-xs text-gray-500 mb-1">Color</p>
+                          <div className="bg-gray-50 p-2 rounded border">
+                            <div className="flex items-center gap-2">
+                              {item.colors.map((color, colorIndex) => (
+                                <div key={colorIndex} className="flex items-center gap-1">
+                                  <div 
+                                    className="w-4 h-4 rounded border border-gray-300"
+                                    style={{ backgroundColor: color.toLowerCase() }}
+                                  ></div>
+                                  <span className="text-sm font-semibold text-gray-900">{color}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Notes/Description */}
+                      {item.description && (
+                        <div className="mb-3">
+                          <p className="text-xs text-gray-500 mb-1">Notes</p>
+                          <div className="bg-gray-50 p-2 rounded border">
+                            <p className="text-sm text-gray-700">{item.description}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Request Summary - Compact */}
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+                    <DollarSign className="w-4 h-4 mr-2 text-green-600" />
+                    Request Summary
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-3 bg-gray-50 rounded border">
+                      <p className="text-2xl font-bold text-green-600">${selectedRequest.totalAmount.toFixed(2)}</p>
+                      <p className="text-xs text-gray-500">Total Amount</p>
+                    </div>
+                    <div className="text-center p-3 bg-gray-50 rounded border">
+                      <p className="text-2xl font-bold text-blue-600">{selectedRequest.items.length}</p>
+                      <p className="text-xs text-gray-500">Total Items</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+                      {/* Action Panel */}
+                      <div className="lg:col-span-1">
+                        <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 sticky top-4 space-y-3">
+                          <h4 className="text-sm font-semibold text-gray-900 flex items-center">
+                            <Info className="w-4 h-4 mr-2 text-orange-600" />
+                            Request Actions
+                          </h4>
+                          
+                          <div className="space-y-2">
+                            <button className="w-full px-3 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 text-sm shadow-md hover:shadow-lg">
+                              Update Status
+                            </button>
+                            <button className="w-full px-3 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 text-sm shadow-md hover:shadow-lg">
+                              Generate Report
+                            </button>
+                            <button className="w-full px-3 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all duration-200 text-sm shadow-md hover:shadow-lg">
+                              Export Details
+                            </button>
+                          </div>
+                          
+                          <div className="pt-2 border-t border-gray-200">
+                            <button 
+                              onClick={() => setSelectedRequest(null)}
+                              className="w-full px-3 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-all duration-200 text-sm"
+                            >
+                              Close
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Modal Footer */}
+                <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
+                  <button
+                    onClick={() => setSelectedRequest(null)}
+                    className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+      {/* Request Review Modal */}
+      {reviewRequest && (
+        <BuyForMeRequestReview
+          request={reviewRequest}
+          onSave={fetchRequests}
+          onRequestUpdate={(updatedRequest) => {
+            // Update the reviewRequest state with the new data
+            setReviewRequest(updatedRequest);
+          }}
+          onReview={async (reviewData) => {
+            try {
+              const token = localStorage.getItem('adminToken');
+              const response = await fetch(`/api/buyme/${reviewRequest.id}/review`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(reviewData),
+              });
+
+              if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to submit review');
+              }
+
+              const result = await response.json();
+              console.log('Review submitted successfully:', result);
+              
+              // Close the review modal
+              setReviewRequest(null);
+              
+              // Refresh the requests list
+              await fetchRequests();
+              
+              // Show success message
+              alert('Review submitted successfully!');
+            } catch (error) {
+              console.error('Error submitting review:', error);
+              alert(`Failed to submit review: ${error.message}`);
+            }
+          }}
+          onClose={() => setReviewRequest(null)}
+        />
+      )}
+
+      {/* Create Request for Customer Modal */}
+      {showCreateForm && (
+        <CreateRequestForCustomer
+          onClose={() => setShowCreateForm(false)}
+          onSuccess={() => {
+            // Refresh the requests list after successful creation
+            fetchRequests();
+          }}
+        />
+      )}
+
+      {/* More Filters Modal */}
+      {showMoreFilters && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-medium text-gray-900">
+                  Advanced Filters
+                </h3>
+                <button
+                  onClick={() => setShowMoreFilters(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Date Range Filter */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Date Range
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Start Date</label>
+                      <input
+                        type="date"
+                        value={advancedFilters.dateRange.startDate}
+                        onChange={(e) => setAdvancedFilters(prev => ({
+                          ...prev,
+                          dateRange: { ...prev.dateRange, startDate: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">End Date</label>
+                      <input
+                        type="date"
+                        value={advancedFilters.dateRange.endDate}
+                        onChange={(e) => setAdvancedFilters(prev => ({
+                          ...prev,
+                          dateRange: { ...prev.dateRange, endDate: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Amount Range Filter */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Amount Range
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Min Amount ($)</label>
+                      <input
+                        type="number"
+                        value={advancedFilters.amountRange.minAmount}
+                        onChange={(e) => setAdvancedFilters(prev => ({
+                          ...prev,
+                          amountRange: { ...prev.amountRange, minAmount: e.target.value }
+                        }))}
+                        placeholder="0.00"
+                        min="0"
+                        step="0.01"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Max Amount ($)</label>
+                      <input
+                        type="number"
+                        value={advancedFilters.amountRange.maxAmount}
+                        onChange={(e) => setAdvancedFilters(prev => ({
+                          ...prev,
+                          amountRange: { ...prev.amountRange, maxAmount: e.target.value }
+                        }))}
+                        placeholder="1000.00"
+                        min="0"
+                        step="0.01"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Customer Filter */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Customer Name/Email
+                  </label>
+                  <input
+                    type="text"
+                    value={advancedFilters.customerFilter}
+                    onChange={(e) => setAdvancedFilters(prev => ({
+                      ...prev,
+                      customerFilter: e.target.value
+                    }))}
+                    placeholder="Filter by customer name or email..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                {/* Request Number Filter */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Request Number
+                  </label>
+                  <input
+                    type="text"
+                    value={advancedFilters.requestNumberFilter}
+                    onChange={(e) => setAdvancedFilters(prev => ({
+                      ...prev,
+                      requestNumberFilter: e.target.value
+                    }))}
+                    placeholder="Filter by request number..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                {/* Notes and Images Filters */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Has Notes
+                    </label>
+                    <select
+                      value={advancedFilters.hasNotes}
+                      onChange={(e) => setAdvancedFilters(prev => ({
+                        ...prev,
+                        hasNotes: e.target.value as 'all' | 'yes' | 'no'
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="all">All</option>
+                      <option value="yes">Has Notes</option>
+                      <option value="no">No Notes</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Has Images
+                    </label>
+                    <select
+                      value={advancedFilters.hasImages}
+                      onChange={(e) => setAdvancedFilters(prev => ({
+                        ...prev,
+                        hasImages: e.target.value as 'all' | 'yes' | 'no'
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="all">All</option>
+                      <option value="yes">Has Images</option>
+                      <option value="no">No Images</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-between items-center pt-6 border-t border-gray-200 mt-6">
+                <button
+                  onClick={() => {
+                    setAdvancedFilters({
+                      dateRange: { startDate: '', endDate: '' },
+                      amountRange: { minAmount: '', maxAmount: '' },
+                      customerFilter: '',
+                      requestNumberFilter: '',
+                      hasNotes: 'all',
+                      hasImages: 'all'
+                    });
+                  }}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
+                >
+                  Clear All Filters
+                </button>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setShowMoreFilters(false)}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => setShowMoreFilters(false)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Apply Filters
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default BuyForMeManagement;

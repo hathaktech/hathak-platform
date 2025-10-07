@@ -1,0 +1,7 @@
+JWT Secret:
+AN=^s:}+_z|R)-uS($>p\<E7YvTnP4F56gy.21,9KMoHJk`fx?Ce8&hwdrQDbO%W
+
+
+Session Secret:
+
+`).!i<,us}Yj>Q-5a1$(^JgUP6l&k8E@LXz4H?OpV[Zn|rv7Th]b+;9m3K:tS\RD

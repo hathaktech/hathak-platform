@@ -1,0 +1,54 @@
+{
+  "name": "hathak-platform",
+  "version": "1.0.0",
+  "description": "Multi-service e-commerce and logistics platform (Buy for Me, Retail, Wholesale, Traveler Shipping)",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "dev:optimized": "cross-env NODE_OPTIONS=--max-old-space-size=2048 nodemon index.js",
+    "dev:low-memory": "cross-env NODE_OPTIONS=--max-old-space-size=1024 --max-semi-space-size=64 --gc-interval=100 nodemon index.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "seed": "node seeder.js",
+    "seed:users": "node userSeeder.js",
+    "seed:box-contents": "node boxContentSeeder.js",
+    "seed:buyme-contents": "node buyMeBoxContentSeeder.js",
+    "seed:complete-contents": "node completeBoxContentSeeder.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hathaktech/hathak-platform.git"
+  },
+  "keywords": [],
+  "author": "hathak",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/hathaktech/hathak-platform/issues"
+  },
+  "homepage": "https://github.com/hathaktech/hathak-platform#readme",
+  "dependencies": {
+    "axios": "^1.11.0",
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
+    "express-session": "^1.18.2",
+    "express-validator": "^7.2.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.18.0",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "cross-env": "^10.0.0",
+    "jest": "^30.2.0",
+    "nodemon": "^3.1.10",
+    "supertest": "^7.1.4"
+  }
+}
